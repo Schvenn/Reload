@@ -1,41 +1,42 @@
 function reload ([string]$command) {# Reload a Module or the PowerShell environment.
+$instance=Split-Path -Leaf (Get-Process -Id $PID).Path
 
-function usage {Write-Host -f cyan "`nUsage: Reload (PowerShell/Clear/ModuleName)`n"; return}
+function usage {Write-Host -f cyan "`nUsage: Reload (PowerShell/Pwsh/Clear/ModuleName)`n"; return}
 
 # Error-checking.
 if (-not $command -or $command.length -le 1) {usage; return}
 
 # Reload PowerShell.
-if ($command -match "(?i)^powershell$") {Start-Process pwsh -ArgumentList "-NoExit"; exit}
+if ($command -match "(?i)^p(owershell|wsh)$") {Start-Process $instance -ArgumentList "-NoExit"; exit}
 
 # Clear-History and restart Powershell.
-if ($command -match "(?i)^clear$") {if (Test-Path "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt") {Remove-Item $historyFile -Force}; cmd /c "pwsh -NoExit"; clear-history; clear-content $goodhistory; exit}
+if ($command -match "(?i)^clear$") {if (Test-Path "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt") {Remove-Item $historyFile -Force}; cmd /c "$instance -NoExit"; clear-history; clear-content $goodhistory; exit}
 
 # Reload Function.
 if ($command -match "(?i)^f(unctio)?n:([\w-]+)$") {$funcName = $matches[2]
 $func = Get-Command $funcName -CommandType Function -ErrorAction SilentlyContinue; if (-not $func) {return}
 $mod = $func.Module; if (-not $mod) {return}
 
-Remove-Item Function:$funcName -ErrorAction SilentlyContinue; if ($?) {Write-Host -f yellow "`nRemoved function: " -NoNewLine; Write-Host -f white "$funcName"}
-else {Write-Host -f red "`nFailed to remove function " -NoNewLine; Write-Host -f white "$funcName"}
+Remove-Item Function:$funcName -ErrorAction SilentlyContinue; if ($?) {Write-Host -f yellow "`nRemoved function: " -n; Write-Host -f white "$funcName"}
+else {Write-Host -f red "`nFailed to remove function " -n; Write-Host -f white "$funcName"}
 
-Import-Module $mod.Name -Force -ErrorAction SilentlyContinue; if ($?) {Write-Host -f green "Reloaded module: " -NoNewLine; Write-Host -f white $mod}
-else {Write-Host -f red "Failed to import module " -NoNewLine; Write-Host -f white ($mod.name).ToUpper()}; ""; return}
+Import-Module $mod.Name -Force -ErrorAction SilentlyContinue; if ($?) {Write-Host -f green "Reloaded module: " -n; Write-Host -f white $mod}
+else {Write-Host -f red "Failed to import module " -n; Write-Host -f white ($mod.name).ToUpper()}; ""; return}
 
 # Error-checking.
 if (-not (Get-Module $command -ErrorAction SilentlyContinue)) {usage; return}
 
 # Reload a module.
-""; (Get-Command -Module $command -ErrorAction SilentlyContinue).ForEach{Remove-Item Function:$_ -Force; if ($?) {Write-Host -f yellow "Removed function: " -NoNewLine; Write-Host -f white "$_"}
-else {Write-Host -f red "Failed to remove function " -NoNewLine; Write-Host -f white "$_"}}
+""; (Get-Command -Module $command -ErrorAction SilentlyContinue).ForEach{Remove-Item Function:$_ -Force; if ($?) {Write-Host -f yellow "Removed function: " -n; Write-Host -f white "$_"}
+else {Write-Host -f red "Failed to remove function " -n; Write-Host -f white "$_"}}
 
 Remove-Module $command -Force -ErrorAction SilentlyContinue
-if ($?) {Write-Host -f yellow "`nRemoved module: " -NoNewLine; Write-Host -f white $command.ToUpper()}
-else {Write-Host -f red "`nFailed to remove module " -NoNewLine; Write-Host -f white "$command"}
+if ($?) {Write-Host -f yellow "`nRemoved module: " -n; Write-Host -f white $command.ToUpper()}
+else {Write-Host -f red "`nFailed to remove module " -n; Write-Host -f white "$command"}
 
 ipmo $command -Force -ErrorAction SilentlyContinue
-if ($?) {Write-Host -f green "Reloaded module: " -NoNewLine; Write-Host -f white $command.ToUpper(); ""}
-else {Write-Host -f red "Failed to import module " -NoNewLine; Write-Host -f white $command.ToUpper(); ""}}
+if ($?) {Write-Host -f green "Reloaded module: " -n; Write-Host -f white $command.ToUpper(); ""}
+else {Write-Host -f red "Failed to import module " -n; Write-Host -f white $command.ToUpper(); ""}}
 
 Export-ModuleMember -Function reload
 
