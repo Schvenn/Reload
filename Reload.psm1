@@ -4,7 +4,7 @@ $instance=Split-Path -Leaf (Get-Process -Id $PID).Path
 function usage {Write-Host -f cyan "`nUsage: Reload (PowerShell/Pwsh/Clear/ModuleName)`n"; return}
 
 # Error-checking.
-if (-not $command -or $command.length -le 1) {usage; return}
+if ($command.length -le 1) {usage; return}
 
 # Reload PowerShell.
 if ($command -match "(?i)^p(owershell|wsh)$") {Start-Process $instance -ArgumentList "-NoExit"; exit}
@@ -23,8 +23,8 @@ else {Write-Host -f red "`nFailed to remove function " -n; Write-Host -f white "
 Import-Module $mod.Name -Force -ErrorAction SilentlyContinue; if ($?) {Write-Host -f green "Reloaded module: " -n; Write-Host -f white $mod}
 else {Write-Host -f red "Failed to import module " -n; Write-Host -f white ($mod.name).ToUpper()}; ""; return}
 
-# Error-checking.
-if (-not (Get-Module $command -ErrorAction SilentlyContinue)) {usage; return}
+# Try to load the module if it's not already loaded.
+if (-not (Get-Module $command -ErrorAction SilentlyContinue)) {try {ipmo $command -ErrorAction Stop; Write-Host -f green "`nLoaded module: " -n; Write-Host -f white $command.ToUpper()} catch {Write-Host -f white "`nFailed to import module: " -n; Write-Host -f red ($command).ToUpper(); Write-Host -f yellow ("-" * 100); $result = "$_.Exception.Message"; Write-Host -f white "`n$($result.substring(120))`n"; Write-Host -f yellow ("-" * 100)}; ""; return}
 
 # Reload a module.
 ""; (Get-Command -Module $command -ErrorAction SilentlyContinue).ForEach{Remove-Item Function:$_ -Force; if ($?) {Write-Host -f yellow "Removed function: " -n; Write-Host -f white "$_"}
@@ -36,7 +36,7 @@ else {Write-Host -f red "`nFailed to remove module " -n; Write-Host -f white "$c
 
 ipmo $command -Force -ErrorAction SilentlyContinue
 if ($?) {Write-Host -f green "Reloaded module: " -n; Write-Host -f white $command.ToUpper(); ""}
-else {Write-Host -f red "Failed to import module " -n; Write-Host -f white $command.ToUpper(); ""}}
+else {Write-Host -f red "Failed to import module: " -n; Write-Host -f white ($command).ToUpper(); ""}}
 
 Export-ModuleMember -Function reload
 
