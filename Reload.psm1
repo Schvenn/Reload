@@ -1,4 +1,10 @@
-function reload ([string]$command) {# Reload a Module or the PowerShell environment.
+function reload ($command) {# Reload a Module or the PowerShell environment.
+$script:powershell = Split-Path $profile; $basemodulepath = Join-Path $script:powershell "Modules\Reload"; $script:configpath = Join-Path $basemodulepath "Reload.psd1"
+
+if (!(Test-Path $script:configpath)) {throw "Config file not found at $script:configpath"}
+$config = Import-PowerShellDataFile -Path $configpath
+$script:commonerrors = $config.PrivateData.commonerrors
+
 $instance=Split-Path -Leaf (Get-Process -Id $PID).Path
 
 function usage {Write-Host -f cyan "`nUsage: Reload (PowerShell/Pwsh/Clear/ModuleName)`n"; return}
@@ -29,6 +35,9 @@ if (-not (Get-Module $command -ErrorAction SilentlyContinue)) {try {ipmo $comman
 # Reload a module.
 ""; (Get-Command -Module $command -ErrorAction SilentlyContinue).ForEach{Remove-Item Function:$_ -Force; if ($?) {Write-Host -f yellow "Removed function: " -n; Write-Host -f white "$_"}
 else {Write-Host -f red "Failed to remove function " -n; Write-Host -f white "$_"}}
+
+# Warn of the most common logic errors.
+if (Get-Command findin -ErrorAction SilentlyContinue) {Write-Host -f yellow "`nSearching for common PowerShell errors inside '$command':"; $current = Get-Location; sl $powershell; $pattern = '(?i)' + ($script:commonerrors -join '|'); findin "$command.psm1" $pattern -recurse; sl $current}
 
 Remove-Module $command -Force -ErrorAction SilentlyContinue
 if ($?) {Write-Host -f yellow "`nRemoved module: " -n; Write-Host -f white $command.ToUpper()}
