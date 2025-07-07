@@ -1,5 +1,38 @@
-function reload ($command) {# Reload a Module or the PowerShell environment.
+function reload ($command, [switch]$help) {# Reload a Module or the PowerShell environment.
 $script:powershell = Split-Path $profile; $basemodulepath = Join-Path $script:powershell "Modules\Reload"; $script:configpath = Join-Path $basemodulepath "Reload.psd1"
+
+# Modify fields sent to it with proper word wrapping.
+function wordwrap ($field, $maximumlinelength) {if ($null -eq $field) {return $null}
+$breakchars = ',.;?!\/ '; $wrapped = @()
+if (-not $maximumlinelength) {[int]$maximumlinelength = (100, $Host.UI.RawUI.WindowSize.Width | Measure-Object -Maximum).Maximum}
+if ($maximumlinelength -lt 60) {[int]$maximumlinelength = 60}
+if ($maximumlinelength -gt $Host.UI.RawUI.BufferSize.Width) {[int]$maximumlinelength = $Host.UI.RawUI.BufferSize.Width}
+foreach ($line in $field -split "`n", [System.StringSplitOptions]::None) {if ($line -eq "") {$wrapped += ""; continue}
+$remaining = $line
+while ($remaining.Length -gt $maximumlinelength) {$segment = $remaining.Substring(0, $maximumlinelength); $breakIndex = -1
+foreach ($char in $breakchars.ToCharArray()) {$index = $segment.LastIndexOf($char)
+if ($index -gt $breakIndex) {$breakIndex = $index}}
+if ($breakIndex -lt 0) {$breakIndex = $maximumlinelength - 1}
+$chunk = $segment.Substring(0, $breakIndex + 1); $wrapped += $chunk; $remaining = $remaining.Substring($breakIndex + 1)}
+if ($remaining.Length -gt 0 -or $line -eq "") {$wrapped += $remaining}}
+return ($wrapped -join "`n")}
+
+if ($help) {# Inline help.
+function scripthelp ($section) {# (Internal) Generate the help sections from the comments section of the script.
+""; Write-Host -f yellow ("-" * 100); $pattern = "(?ims)^## ($section.*?)(##|\z)"; $match = [regex]::Match($scripthelp, $pattern); $lines = $match.Groups[1].Value.TrimEnd() -split "`r?`n", 2; Write-Host $lines[0] -f yellow; Write-Host -f yellow ("-" * 100)
+if ($lines.Count -gt 1) {wordwrap $lines[1] 100| Out-String | Out-Host -Paging}; Write-Host -f yellow ("-" * 100)}
+$scripthelp = Get-Content -Raw -Path $PSCommandPath; $sections = [regex]::Matches($scripthelp, "(?im)^## (.+?)(?=\r?\n)")
+if ($sections.Count -eq 1) {cls; Write-Host "$([System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)) Help:" -f cyan; scripthelp $sections[0].Groups[1].Value; ""; return}
+
+$selection = $null
+do {cls; Write-Host "$([System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)) Help Sections:`n" -f cyan; for ($i = 0; $i -lt $sections.Count; $i++) {
+"{0}: {1}" -f ($i + 1), $sections[$i].Groups[1].Value}
+if ($selection) {scripthelp $sections[$selection - 1].Groups[1].Value}
+$input = Read-Host "`nEnter a section number to view"
+if ($input -match '^\d+$') {$index = [int]$input
+if ($index -ge 1 -and $index -le $sections.Count) {$selection = $index}
+else {$selection = $null}} else {""; return}}
+while ($true); return}
 
 if (!(Test-Path $script:configpath)) {throw "Config file not found at $script:configpath"}
 $config = Import-PowerShellDataFile -Path $configpath
@@ -59,4 +92,26 @@ Reload Clear: This will forcibly erase the command history and restart the curre
 Reload <Function/Fn:FunctionName>: This will remove a single function and reload the module in which it resides.
 
 Reload <ModuleName>: This will clear all functions of a module, remove and reload the module.
+## License
+MIT License
+
+Copyright © 2025 Craig Plath
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE.
 ##>
